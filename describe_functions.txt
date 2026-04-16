@@ -1,0 +1,125 @@
+ABM4energie Project README
+
+Overview:
+This project loads survey JSON data, cleans it, maps records to Agent objects, builds a neighbor graph, and runs a simple adoption simulation in steps.
+
+Project files and flow:
+
+1. src/db/repository.py
+   - Loads survey.json once at import time.
+   - Exposes `data` containing raw JSON records.
+
+2. src/db/services.py
+   - normalize_value(value): cleans a single field.
+     * strips whitespace
+     * turns empty string, "." or "null" into None
+   - fill_defaults(record): cleans each field in a record.
+     * sets GROUP_BEH to "6" when missing or invalid
+     * converts other invalid fields to empty string
+   - clean_survey_data(records): filters and cleans records.
+     * skips records without GROUP_BEH
+     * ensures GROUP_BEH is present and normalized
+   - load_survey_data(): returns cleaned survey records as a list of dicts.
+
+3. src/agents/schemas.py
+   - Defines the Agent model:
+     * id: int
+     * group: Optional[int]
+     * income: Optional[float]
+     * age: Optional[int]
+     * building_type: Optional[str]
+     * municipality: Optional[str]
+     * state: Optional[str]
+   - State is derived from GROUP_BEH mapping.
+
+4. src/agents/services.py
+   - parse_int(value): safely converts input to int or returns None.
+   - parse_float(value): safely converts input to float or returns None.
+   - get_state_by_group(group): maps groups to states:
+       1,2,3 -> ADOPTED
+       4,5 -> AWARE
+       6 -> UNAWARE
+   - record_to_agent(record): converts a cleaned survey record to Agent.
+   - load_agents(): loads cleaned survey records and returns a list of Agent objects.
+
+5. src/simulation/network.py
+   - Builds the network graph between agents.
+   - same_municipality(agent, other): true if both share municipality.
+   - spatial_weight(agent, other): 1.0 for same municipality, 0.0 otherwise.
+   - numeric_similarity(value_a, value_b, max_diff): returns similarity [0,1].
+   - homophily_weight(agent, other): averages similarity for income, age, and building_type.
+   - influence_weight(agent, other): averages influence by group values:
+       1,2 -> 1.0
+       3 -> 0.8
+       4 -> 0.5
+       5 -> 0.4
+       6 -> 0.0
+   - edge_weight(agent, other): final weight = 0.4*spatial + 0.3*homophily + 0.3*influence.
+   - build_agent_graph(agents): creates a networkx Graph with agent nodes and weighted edges.
+     * only connects agents who share the same municipality.
+
+6. src/simulation/services.py
+   - run_simulation(): loads agents and builds the agent graph.
+   - This is the entry point for graph creation used by the API.
+
+7. src/simulation/core.py
+   - Defines the step-based adoption simulation.
+   - BASE_ADOPTION_PROBABILITY: base chance by state.
+   - STATE_TRANSITION: UNAWARE -> AWARE -> ADOPTED.
+   - StepResult: stores per-step summary.
+   - SimulationState:
+       * init_agents(agents, graph): initializes state tracking for each agent.
+       * get_neighbors(agent_id): returns graph neighbors.
+       * get_edge_weight(agent_id, neighbor_id): returns edge weight.
+       * calculate_adoption_probability(agent_id): computes P(adopt) = 1 - Π(1 - weight * base_p) over ADOPTED neighbors.
+       * update_agent_state(agent_id, adopt): updates state if adoption occurs.
+       * get_state_distribution(): counts agents by state.
+       * get_group_distribution(): counts agents by group.
+       * count_adopted(): counts ADOPTED agents.
+   - run_simulation_steps(agents, graph, num_steps): runs simulation for the requested number of steps and returns results.
+     * For each step, iterates agents, computes adoption probability, and updates state.
+     * Saves step result: step number, adopted count, distribution by state and group.
+   - The function accepts both Agent objects and node dicts when agents are loaded from a graph.
+
+8. src/agents/views.py
+   - Provides GET /agents endpoint.
+   - Returns the list of Agent objects loaded from cleaned data.
+
+9. src/simulation/views.py
+   - Provides GET /simulation endpoint.
+     * returns first 10 graph nodes and first 10 edges.
+   - Provides GET /simulation/steps endpoint.
+     * runs `run_simulation_steps` with the graph and returns step results.
+
+10. src/main.py
+   - Main FastAPI application.
+   - Includes routers from agents and simulation.
+   - Exposes API endpoints under `/agents`, `/simulation`, `/simulation/steps`.
+
+Execution order:
+1. Start the app with `uvicorn src.main:app --reload`.
+2. Request `/agents` to get mapped Agent objects.
+3. Request `/simulation` to build the graph and see a sample of nodes/edges.
+4. Request `/simulation/steps?num_steps=N` to run the adoption dynamics and collect results per step.
+
+Important details:
+- The project is mostly synchronous; async is not required unless external I/O or DB is added.
+- The graph is built from static agent attributes, so simulation uses a fixed network.
+- `run_simulation_steps` is the main function for stepwise adoption analysis.
+
+Current limitations:
+- `src/db/views.py` exists but is not included in `main.py`.
+- Data is loaded from `survey.json` and cleaned in memory.
+- `/simulation` returns only 10 nodes and 10 edges by design.
+
+How the core library is connected:
+- `simulation/services.py` builds graph from agents.
+- `simulation/core.py` consumes that graph to calculate adoption probabilities.
+- `simulation/views.py` exposes simulation results via HTTP.
+
+Usage examples:
+- `GET /agents`
+- `GET /simulation`
+- `GET /simulation/steps?num_steps=5`
+
+This README explains the current implementation and the path from raw JSON to final simulation output.
