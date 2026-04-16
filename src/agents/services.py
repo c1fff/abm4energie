@@ -57,6 +57,11 @@ def record_to_agent(record: Dict[str, Any]) -> Agent:
         income=parse_float(record.get("HOUSE_Income")),
         age=parse_int(record.get("SOCIO_Age1")),
         building_type=record.get("BUILD_Type") or None,
+        build_age=parse_int(record.get("BUILD_Age")),
+        energy_std=record.get("BUILD_ES_Cur") or None,
+        subsidy=parse_float(record.get("SUB")),
+        info_pas=parse_float(record.get("INFO_PAS")),
+        info_s11=parse_float(record.get("INFO_S11")),
         municipality=record.get("Gemeindename") or None,
         state=get_state_by_group(group),
     )

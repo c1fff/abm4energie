@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 from src.simulation.core import run_simulation_steps
 
 
@@ -13,19 +13,49 @@ except ImportError:
 
 router = APIRouter()
 
-@router.get("/simulation")
-def get_simulation():
-    graph = run_simulation()
-    return {
-        "nodes": list(graph.nodes(data=True))[:10],
-        "edges": list(graph.edges(data=True))[:10],
-    }
-
 @router.get("/simulation/steps")
-def get_simulation_steps(num_steps: int = 10):
+def get_simulation_steps(
+    num_steps: int = 10,
+    municipality: str = Query(None, description="Filter by municipality"),
+    p_unaware: float = Query(0.01, description="Base adoption probability for UNAWARE state"),
+    p_aware: float = Query(0.15, description="Base adoption probability for AWARE state"),
+    alpha: float = Query(0.4, description="Spatial component weight"),
+    beta: float = Query(0.3, description="Homophily component weight"),
+    gamma: float = Query(0.3, description="Influence component weight"),
+):
+    """
+    Run adoption simulation with configurable parameters.
+    
+    Parameters:
+    - num_steps: Number of simulation steps (default 10)
+    - municipality: Optional municipality filter
+    - p_unaware: Base adoption probability for UNAWARE agents (default 0.01)
+    - p_aware: Base adoption probability for AWARE agents (default 0.15)
+    - alpha: Spatial weight in edge calculation (default 0.4)
+    - beta: Homophily weight in edge calculation (default 0.3)
+    - gamma: Influence weight in edge calculation (default 0.3)
+    """
     graph = run_simulation()
+    
+    # Filter by municipality if specified
+    if municipality:
+        nodes_in_municipality = [
+            node_id for node_id, data in graph.nodes(data=True)
+            if data.get("municipality") == municipality
+        ]
+        graph = graph.subgraph(nodes_in_municipality).copy()
+    
     agents = [{"id": node_id, **data} for node_id, data in graph.nodes(data=True)]
-    step_results = run_simulation_steps(agents, graph, num_steps=num_steps)
+    step_results = run_simulation_steps(
+        agents,
+        graph,
+        num_steps=num_steps,
+        p_unaware=p_unaware,
+        p_aware=p_aware,
+        alpha=alpha,
+        beta=beta,
+        gamma=gamma,
+    )
     return {"steps": [
         {
             "step": r.step,

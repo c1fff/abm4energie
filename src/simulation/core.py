@@ -18,6 +18,39 @@ STATE_TRANSITION = {
 }
 
 
+def susceptibility(agent: Any) -> float:
+    """
+    Calculate personal susceptibility multiplier based on awareness indicators.
+    Uses INFO_PAS and INFO_S11 to quantify agent's awareness of sustainable solutions.
+    
+    Returns a multiplier in range [0.5, 1.5] where:
+    - 0.5: low awareness (baseline reduction)
+    - 1.0: neutral/average awareness
+    - 1.5: high awareness (baseline boost)
+    """
+    if isinstance(agent, dict):
+        info_pas = agent.get("info_pas")
+        info_s11 = agent.get("info_s11")
+    else:
+        info_pas = agent.info_pas
+        info_s11 = agent.info_s11
+    
+    # If no awareness data, use neutral multiplier
+    if info_pas is None and info_s11 is None:
+        return 1.0
+    
+    # Normalize values (assume 0-100 scale)
+    pas_norm = (info_pas / 100.0) if info_pas is not None else 0.5
+    s11_norm = (info_s11 / 100.0) if info_s11 is not None else 0.5
+    
+    # Average awareness, scale to [0.5, 1.5]
+    avg_awareness = (pas_norm + s11_norm) / 2.0
+    # Map [0, 1] to [0.5, 1.5]
+    multiplier = 0.5 + (avg_awareness * 1.0)
+    
+    return min(max(multiplier, 0.5), 1.5)  # Clamp to [0.5, 1.5]
+
+
 @dataclass
 class StepResult:
     step: int
@@ -33,6 +66,15 @@ class SimulationState:
     agents: Dict[int, Agent] = field(default_factory=dict)
     agent_states: Dict[int, str] = field(default_factory=dict)
     graph: Optional[nx.Graph] = None
+    base_adoption_probs: Dict[str, float] = field(default_factory=lambda: {
+        "UNAWARE": 0.01,
+        "AWARE": 0.15,
+        "ADOPTED": 1.0,
+    })
+    # Weighting parameters for influence decomposition
+    alpha: float = 0.4  # spatial weight
+    beta: float = 0.3   # homophily weight
+    gamma: float = 0.3  # influence weight
 
     def init_agents(self, agents: List, graph: nx.Graph) -> None:
         self.graph = graph
@@ -58,25 +100,36 @@ class SimulationState:
         return self.graph[agent_id][neighbor_id].get("weight", 0.0)
 
     def calculate_adoption_probability(self, agent_id: int) -> float:
+        """
+        Calculate adoption probability with susceptibility multiplier.
+        
+        Formula: P(adopt) = susceptibility(agent) * (1 - ∏(1 - edge_weight * base_p))
+                 for all ADOPTED neighbors
+        """
         current_state = self.agent_states.get(agent_id, "UNAWARE")
         if current_state == "ADOPTED":
             return 0.0
 
+        # Get personal susceptibility
+        agent = self.agents.get(agent_id)
+        personal_susceptibility = susceptibility(agent) if agent else 1.0
+
         neighbors = self.get_neighbors(agent_id)
         if not neighbors:
-            base_p = BASE_ADOPTION_PROBABILITY.get(current_state, 0.0)
-            return base_p
+            base_p = self.base_adoption_probs.get(current_state, 0.0)
+            return personal_susceptibility * base_p
 
         product = 1.0
         for neighbor_id in neighbors:
             neighbor_state = self.agent_states.get(neighbor_id, "UNAWARE")
             if neighbor_state == "ADOPTED":
                 edge_weight = self.get_edge_weight(agent_id, neighbor_id)
-                base_p = BASE_ADOPTION_PROBABILITY.get(current_state, 0.0)
+                base_p = self.base_adoption_probs.get(current_state, 0.0)
                 product *= (1.0 - edge_weight * base_p)
 
         probability = 1.0 - product
-        return min(probability, 1.0)
+        # Apply personal susceptibility multiplier
+        return min(personal_susceptibility * probability, 1.0)
 
     def update_agent_state(self, agent_id: int, adopt: bool) -> None:
         current_state = self.agent_states.get(agent_id, "UNAWARE")
@@ -102,9 +155,38 @@ class SimulationState:
 
 
 def run_simulation_steps(
-    agents: List[Agent], graph: nx.Graph, num_steps: int = 10
+    agents: List[Agent],
+    graph: nx.Graph,
+    num_steps: int,
+    p_unaware: float = 0.01,
+    p_aware: float = 0.15,
+    alpha: float = 0.4,
+    beta: float = 0.3,
+    gamma: float = 0.3,
 ) -> List[StepResult]:
+    """
+    Run adoption simulation for specified number of steps.
+    
+    Parameters:
+    - agents: List of Agent objects or dicts
+    - graph: NetworkX graph with agent network
+    - num_steps: Number of simulation steps
+    - p_unaware: Base adoption probability for UNAWARE agents (default 0.01)
+    - p_aware: Base adoption probability for AWARE agents (default 0.15)
+    - alpha: Weight for spatial component (default 0.4)
+    - beta: Weight for homophily component (default 0.3)
+    - gamma: Weight for influence component (default 0.3)
+    """
     state = SimulationState()
+    state.base_adoption_probs = {
+        "UNAWARE": p_unaware,
+        "AWARE": p_aware,
+        "ADOPTED": 1.0,
+    }
+    state.alpha = alpha
+    state.beta = beta
+    state.gamma = gamma
+    
     state.init_agents(agents, graph)
     results = []
 

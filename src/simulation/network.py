@@ -29,10 +29,19 @@ def numeric_similarity(value_a: Optional[float], value_b: Optional[float], max_d
 
 
 def homophily_weight(agent: Agent, other: Agent) -> float:
+    """
+    Computes homophily weight based on:
+    - income (continuous): max_diff 100,000
+    - age (continuous): max_diff 50
+    - building_type (categorical): exact match
+    - build_age (categorical 1-10): exact match
+    Returns average of 4 similarities.
+    """
     income_similarity = numeric_similarity(agent.income, other.income, max_diff=100_000)
     age_similarity = numeric_similarity(agent.age, other.age, max_diff=50)
     building_similarity = 1.0 if agent.building_type and other.building_type and agent.building_type == other.building_type else 0.0
-    return (income_similarity + age_similarity + building_similarity) / 3.0
+    build_age_similarity = 1.0 if agent.build_age and other.build_age and agent.build_age == other.build_age else 0.0
+    return (income_similarity + age_similarity + building_similarity + build_age_similarity) / 4.0
 
 
 def influence_weight(agent: Agent, other: Agent) -> float:
