@@ -9,9 +9,6 @@ app = FastAPI(
     version="1.0.0",
 )
 
-@app.get("/")
-def read_root():
-    return {"Hello": "World"}
 
 app.include_router(agents_router)
 app.include_router(simulation_router)

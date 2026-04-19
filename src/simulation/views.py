@@ -11,7 +11,7 @@ except ImportError:
     sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
     from src.simulation.services import run_simulation
 
-router = APIRouter()
+router = APIRouter(tags=["simulation"], prefix="/simulation")
 
 @router.get("/simulation/steps")
 def get_simulation_steps(

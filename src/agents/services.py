@@ -50,11 +50,18 @@ def record_to_agent(record: Dict[str, Any]) -> Agent:
     agent_id = parse_int(record.get("id"))
     if agent_id is None:
         raise ValueError("Record must contain a valid numeric id")
+    
+    house_income = parse_float(record.get("HOUSE_Income"))
+    income = (1.0, 2.0, 3.0, 4.0, 5.0)
+
+    if house_income not in income:
+        house_income = None # Set to None if income is not in the expected range
+        
 
     return Agent(
         id=agent_id,
         group=group,
-        income=parse_float(record.get("HOUSE_Income")),
+        income=house_income,
         age=parse_int(record.get("SOCIO_Age1")),
         building_type=record.get("BUILD_Type") or None,
         build_age=parse_int(record.get("BUILD_Age")),
