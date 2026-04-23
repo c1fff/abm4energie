@@ -1,0 +1,47 @@
+.
+├── README.md
+├── abm4energie.Rproj
+├── describe_functions.txt
+├── requirements.txt
+├── src
+│   ├── __pycache__
+│   │   └── main.cpython-39.pyc
+│   ├── agents
+│   │   ├── __pycache__
+│   │   ├── schemas.py
+│   │   ├── services.py
+│   │   └── views.py
+│   ├── db
+│   │   ├── __pycache__
+│   │   ├── repository.py
+│   │   └── services.py
+│   ├── main.py
+│   ├── scripts
+│   │   └── tests.py
+│   └── simulation
+│       ├── __pycache__
+│       ├── core.py
+│       ├── network.py
+│       ├── services.py
+│       └── views.py
+├── ../../survey.json
+└── venv
+    ├── bin
+    │   ├── Activate.ps1
+    │   ├── activate
+    │   ├── activate.csh
+    │   ├── activate.fish
+    │   ├── easy_install
+    │   ├── easy_install-3.9
+    │   ├── fastapi
+    │   ├── pip
+    │   ├── pip3
+    │   ├── pip3.9
+    │   ├── python -> python3
+    │   ├── python3 -> /Library/Frameworks/Python.framework/Versions/3.9/bin/python3
+    │   ├── python3.9 -> python3
+    │   └── uvicorn
+    ├── include
+    ├── lib
+    │   └── python3.9
+    └── pyvenv.cfg

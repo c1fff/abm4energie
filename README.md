@@ -4,7 +4,7 @@ Agent-Based Modeling project for heating adoption behavior in Salzburg.
 
 ## Overview
 
-ABM4energie loads survey data from `survey.json`, converts each record into an `Agent`, builds a weighted social network, and simulates adoption dynamics over multiple steps.
+ABM4energie loads survey data from `../../survey.json`, converts each record into an `Agent`, builds a weighted social network, and simulates adoption dynamics over multiple steps.
 
 The simulation uses:
 - municipality-based spatial connectivity
@@ -15,7 +15,7 @@ The simulation uses:
 ## Project Structure
 
 - `src/main.py` - FastAPI application entry point.
-- `src/db/repository.py` - loads raw survey JSON from `survey.json`.
+- `src/db/repository.py` - loads raw survey JSON from `../../survey.json`.
 - `src/db/services.py` - cleans survey records and fills defaults.
 - `src/agents/schemas.py` - defines the `Agent` data model.
 - `src/agents/services.py` - converts cleaned records into `Agent` objects.
