@@ -56,6 +56,14 @@ Desktop.ini
 *.sqlite3
 *.sql
 
+# Analysis folder
+analysis/bin/
+analysis/etc/
+analysis/include/
+analysis/lib/
+analysis/share/
+analysis/pyvenv.cfg
+
 # Logs and temp
 *.log
 logs/
