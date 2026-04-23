@@ -101,6 +101,14 @@ cd C:\Users\rauan\Desktop\Projects\abm4energie
 venv\Scripts\Activate.ps1
 uvicorn src.main:app --reload
 ```
+### For analysis
+```
+source venv/bin/activate
+cd analysis
+pip3 install requirements.txt
+python3 main.py
+```
+
 
 Open the API docs at `http://127.0.0.1:8000/docs`.
 
