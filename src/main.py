@@ -2,6 +2,9 @@ import uvicorn
 from fastapi import FastAPI
 from src.agents.views import router as agents_router
 from src.simulation.views import router as simulation_router
+from fastapi.middleware.cors import CORSMiddleware
+
+
 
 app = FastAPI(
     title="ABM4",
@@ -9,6 +12,12 @@ app = FastAPI(
     version="1.0.0",
 )
 
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(agents_router)
 app.include_router(simulation_router)

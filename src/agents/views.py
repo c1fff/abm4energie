@@ -28,3 +28,11 @@ def get_income_groups():
         else:
             income_groups[agent.income] = income_groups.get(agent.income, 0) + 1
     return income_groups
+
+@router.get("/agents/current_state")
+def get_agents_current_state_by_id(id: int):
+    agents = load_agents()
+    for agent in agents:
+        if agent.id == id:
+            return {"id": agent.id, "current_state": agent.state}
+    return {"error": "Agent not found"}

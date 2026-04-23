@@ -163,7 +163,7 @@ def run_simulation_steps(
     alpha: float = 0.4,
     beta: float = 0.3,
     gamma: float = 0.3,
-) -> List[StepResult]:
+) -> tuple[List[StepResult], Dict[int, Any]]:
     """
     Run adoption simulation for specified number of steps.
     
@@ -176,6 +176,11 @@ def run_simulation_steps(
     - alpha: Weight for spatial component (default 0.4)
     - beta: Weight for homophily component (default 0.3)
     - gamma: Weight for influence component (default 0.3)
+    
+    Returns:
+    - tuple: (step_results, agent_history)
+      - step_results: List of StepResult for each step
+      - agent_history: Dict mapping agent_id to list of historical records
     """
     state = SimulationState()
     state.base_adoption_probs = {
@@ -189,18 +194,52 @@ def run_simulation_steps(
     
     state.init_agents(agents, graph)
     results = []
+    agent_history = {}
+    
+    # Initialize agent history dictionary
+    for agent_id in state.agents.keys():
+        agent_history[agent_id] = []
 
     for step in range(num_steps):
         agent_ids = list(state.agents.keys())
         for agent_id in agent_ids:
             current_state = state.agent_states.get(agent_id, "UNAWARE")
-            if current_state == "ADOPTED":
-                continue
-
-            probability = state.calculate_adoption_probability(agent_id)
-            import random
-            if random.random() < probability:
-                state.update_agent_state(agent_id, True)
+            
+            # Collect neighbor information for history (only for non-adopted agents)
+            neighbors_info = []
+            probability = 0.0
+            changed = False
+            
+            if current_state != "ADOPTED":
+                probability = state.calculate_adoption_probability(agent_id)
+                
+                # Collect neighbor information for history
+                for neighbor_id in state.get_neighbors(agent_id):
+                    neighbor_state = state.agent_states.get(neighbor_id, "UNAWARE")
+                    if neighbor_state == "ADOPTED":
+                        edge_weight = state.get_edge_weight(agent_id, neighbor_id)
+                        base_p = state.base_adoption_probs.get(current_state, 0.0)
+                        contribution = edge_weight * base_p
+                        neighbors_info.append({
+                            "id": neighbor_id,
+                            "state": neighbor_state,
+                            "weight": edge_weight,
+                            "contribution": contribution
+                        })
+                
+                import random
+                if random.random() < probability:
+                    state.update_agent_state(agent_id, True)
+                    changed = True
+            
+            # Record agent history
+            agent_history[agent_id].append({
+                "step": step,
+                "state": state.agent_states.get(agent_id, current_state),
+                "adoption_probability": probability,
+                "changed": changed,
+                "neighbors": neighbors_info
+            })
 
         adopted_count = state.count_adopted()
         adopted_rate = adopted_count / len(agents) if agents else 0.0
@@ -216,4 +255,4 @@ def run_simulation_steps(
         )
         results.append(result)
 
-    return results
+    return results, agent_history
