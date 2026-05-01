@@ -1,6 +1,6 @@
 # ABM4energie
 
-Agent-Based Modeling project for heating adoption behavior in Salzburg.
+Agent-Based Modeling project for heating adoption behavior in Steiermark.
 
 ## Overview
 
