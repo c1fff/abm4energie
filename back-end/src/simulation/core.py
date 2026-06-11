@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 from collections import Counter
 
 from src.agents.schemas import Agent
+from src.agents.services import decision_score
 
 BASE_ADOPTION_PROBABILITY = {
     "UNAWARE": 0.01,
@@ -101,24 +102,25 @@ class SimulationState:
 
     def calculate_adoption_probability(self, agent_id: int) -> float:
         """
-        Calculate adoption probability with susceptibility multiplier.
+        Calculate adoption probability from network pressure and decision score.
         
-        Formula: P(adopt) = susceptibility(agent) * (1 - ∏(1 - edge_weight * base_p))
-                 for all ADOPTED neighbors
+        Formula: P(adopt) = (1 - product(1 - edge_weight * base_p))
+                 * decision_score(agent) for all ADOPTED neighbors.
         """
         current_state = self.agent_states.get(agent_id, "UNAWARE")
         if current_state == "ADOPTED":
             return 0.0
 
-        # Get personal susceptibility
         agent = self.agents.get(agent_id)
-        personal_susceptibility = susceptibility(agent) if agent else 1.0
+        if agent is None:
+            return 0.0
+
+        if isinstance(agent, dict):
+            agent_decision_score = decision_score(Agent(**agent))
+        else:
+            agent_decision_score = decision_score(agent)
 
         neighbors = self.get_neighbors(agent_id)
-        if not neighbors:
-            base_p = self.base_adoption_probs.get(current_state, 0.0)
-            return personal_susceptibility * base_p
-
         product = 1.0
         for neighbor_id in neighbors:
             neighbor_state = self.agent_states.get(neighbor_id, "UNAWARE")
@@ -127,9 +129,9 @@ class SimulationState:
                 base_p = self.base_adoption_probs.get(current_state, 0.0)
                 product *= (1.0 - edge_weight * base_p)
 
-        probability = 1.0 - product
-        # Apply personal susceptibility multiplier
-        return min(personal_susceptibility * probability, 1.0)
+        peer_pressure = 1.0 - product
+        probability = peer_pressure * agent_decision_score
+        return min(max(probability, 0.0), 0.85)
 
     def update_agent_state(self, agent_id: int, adopt: bool) -> None:
         current_state = self.agent_states.get(agent_id, "UNAWARE")

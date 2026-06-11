@@ -146,6 +146,7 @@ let apiData = null;
 let sessionId = null;
 let selectedAgentId = null;
 let agentHistoryCache = {}; // id -> history data
+let decisionScoreCache = {}; // id -> decision score data
 let edgeLines = [];
 let agentMarkers = {};
 let agentStepStates = {};
@@ -195,10 +196,11 @@ async function runSimulation() {
     sessionId = null;
   }
 
-  // Reset agent history panel
+  // Reset agent history and decision model panels
   selectedAgentId = null;
   document.getElementById('agentInfo').innerHTML = 'Click an agent to see details.';
   document.getElementById('agentHistory').innerHTML = '';
+  document.getElementById('decisionModel').innerHTML = 'Click an agent to see decision factors.';
 
   renderGraph();
   btn.disabled = false;
@@ -215,6 +217,7 @@ function renderGraph() {
   Object.values(agentMarkers).forEach(m => map.removeLayer(m.marker));
   agentMarkers = {};
   agentHistoryCache = {};
+  decisionScoreCache = {};
 
   const muni   = apiData.municipality || document.getElementById('municipality').value;
   const center = MUNI_COORDS[muni] || [47.07, 15.44];
@@ -376,6 +379,7 @@ function showInfo(agent) {
 
   selectedAgentId = agent.id;
   fetchAgentHistory(agent.id);
+  fetchAgentDecisionScore(agent.id);
 }
 
 async function fetchAgentHistory(agentId) {
@@ -469,6 +473,79 @@ function renderHistoryDemo(agentId) {
     `<div style="color:var(--muted);font-size:11px;padding:6px">
       Run a real simulation to see step-by-step history for agent #${agentId}.
     </div>`;
+}
+
+async function fetchAgentDecisionScore(agentId) {
+  const decEl = document.getElementById('decisionModel');
+  decEl.innerHTML = '<div style="color:var(--muted);font-size:11px">Loading decision model...</div>';
+
+  // Use cache if available
+  if (decisionScoreCache[agentId]) {
+    renderDecisionModel(decisionScoreCache[agentId]);
+    return;
+  }
+
+  const base = document.getElementById('apiBase').value.replace(/\/$/, '');
+  try {
+    const r = await fetch(`${base}/agents/${agentId}/decision_score`,
+                          { signal: AbortSignal.timeout(10000) });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const data = await r.json();
+    decisionScoreCache[agentId] = data;
+    renderDecisionModel(data);
+  } catch(e) {
+    decEl.innerHTML = `<div style="color:var(--muted);font-size:11px">Decision model unavailable</div>`;
+  }
+}
+
+function renderDecisionModel(data) {
+  const decEl = document.getElementById('decisionModel');
+  if (!data) { decEl.innerHTML = ''; return; }
+
+  const score = (data.decision_score * 100).toFixed(1);
+  const scoreColor = data.decision_score > 0.5 ? 'var(--adopted)' : data.decision_score > 0.25 ? 'var(--aware)' : 'var(--muted)';
+
+  // Build factor list
+  const factors = [];
+  if (data.foerderung !== undefined && data.foerderung !== null) {
+    factors.push({ name: 'Subsidy/Support', val: data.foerderung, type: 'bool' });
+  }
+  if (data.trigger !== undefined && data.trigger !== null) {
+    factors.push({ name: 'Trigger Event', val: data.trigger, type: 'bool' });
+  }
+  if (data.social_influence !== undefined && data.social_influence !== null) {
+    factors.push({ name: 'Social Influence', val: data.social_influence, type: 'num' });
+  }
+  if (data.info_sources !== undefined && data.info_sources !== null) {
+    factors.push({ name: 'Info Sources', val: data.info_sources, type: 'num' });
+  }
+  if (data.known_households !== undefined && data.known_households !== null) {
+    factors.push({ name: 'Known Renovators', val: data.known_households, type: 'num' });
+  }
+
+  const factorHtml = factors.map(f => {
+    let valStr = '';
+    if (f.type === 'bool') {
+      valStr = f.val ? '✓ Yes' : '✗ No';
+    } else if (f.type === 'num') {
+      valStr = typeof f.val === 'number' ? f.val.toFixed(3) : f.val;
+    }
+    return `
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+        <span style="color:var(--muted)">${f.name}</span>
+        <span style="color:var(--text);font-weight:600">${valStr}</span>
+      </div>`;
+  }).join('');
+
+  decEl.innerHTML = `
+    <div style="margin-bottom:8px;padding-bottom:8px;border-bottom:2px solid var(--border)">
+      <div style="color:var(--muted);font-size:9px;text-transform:uppercase;letter-spacing:0.05em">Decision Score</div>
+      <div style="font-size:20px;font-weight:700;color:${scoreColor};margin-top:2px">${score}%</div>
+    </div>
+    <div style="font-size:10px">
+      ${factorHtml}
+    </div>
+  `;
 }
 
 function togglePlay() {

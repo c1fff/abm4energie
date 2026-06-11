@@ -1,5 +1,5 @@
 from fastapi import APIRouter
-from src.agents.services import load_agents
+from src.agents.services import decision_score, load_agents
 
 
 router = APIRouter(tags=["agents"], prefix="/agents")
@@ -35,4 +35,21 @@ def get_agents_current_state_by_id(id: int):
     for agent in agents:
         if agent.id == id:
             return {"id": agent.id, "current_state": agent.state}
+    return {"error": "Agent not found"}
+
+
+@router.get("/{agent_id}/decision_score")
+def get_agent_decision_score(agent_id: int):
+    agents = load_agents()
+    for agent in agents:
+        if agent.id == agent_id:
+            return {
+                "agent_id": agent.id,
+                "foerderung": agent.foerderung,
+                "trigger": agent.trigger,
+                "social_influence": agent.social_influence,
+                "info_sources": agent.info_sources,
+                "known_households": agent.known_households,
+                "decision_score": decision_score(agent),
+            }
     return {"error": "Agent not found"}
